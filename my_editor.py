@@ -2,6 +2,8 @@
 import tkinter as tk 
 from tkinter import ttk,filedialog
 from tkinter import messagebox
+from tkinter import simpledialog
+
 
 #Classe per il widget menu file
 class Menu:
@@ -17,7 +19,14 @@ class Menu:
         file_dropdown.add_command(label="save as",accelerator="Ctrl+Shift+s",command=parent.save_as_file)
         file_dropdown.add_separator()
         file_dropdown.add_command(label="Esc",accelerator="Ctrl+e", command=parent.master.destroy)
+
+        #Set tendina per menu view
+        view_dropdown = tk.Menu(menubar, tearoff=0)
         
+        #Aggiunta comandi per menu view
+        view_dropdown.add_command(label="Search",command=parent.search_and_highlight)
+        view_dropdown.add_command(label="Substitute",command=parent.substitute_window)
+
         #Set tendina per menu about
         about_dropdown = tk.Menu(menubar, tearoff=0)
 
@@ -25,10 +34,10 @@ class Menu:
         about_dropdown.add_command(label="About",command=self.show_about_message)
         about_dropdown.add_command(label="Release note",command=self.show_about_release)
 
-        #Aggiunta cascata per menu file e about
+        #Aggiunta cascata per menu file , view e about
         menubar.add_cascade(label="file",menu=file_dropdown)
+        menubar.add_cascade(label="Search",menu=view_dropdown)
         menubar.add_cascade(label="About",menu=about_dropdown)
-
 
     def show_about_message(self):
         box_message = "Text editor coded in python with Tkinter"
@@ -41,14 +50,10 @@ class Menu:
         messagebox.showinfo(box_title,box_message)
 
 
-        
-
-
-
-
 #Classe per ottenere lo status del sistema
 class Statusbar:
 
+    #Inizializzazione della classe statusbar
     def __init__(self,parent):
         
         #Definizione dello status tramite il widget StringVar
@@ -58,7 +63,7 @@ class Statusbar:
         self.status.set("Status bar")
 
         #Definizione etichetta con padre , testo , colore scritta , colore sfondo , ancoraggio a sudovest- in basso a sx
-        label = tk.Label(parent.text,textvariable=self.status,fg="black",bg="White",anchor="sw")
+        label = tk.Label(parent.text,textvariable=self.status,fg="red",bg="white",anchor="sw")
 
         #Posizionamento dell'etichetta con il metodo pack , situato in basso con side= e espanso con fill
         label.pack(side=tk.BOTTOM,fill=tk.BOTH)
@@ -71,12 +76,13 @@ class Statusbar:
         if isinstance(args[0],bool):
             self.status.set("File saved")
         else:
-            self.status.set("Pytext")
+            self.status.set("File not saved")
 
 
+#Classe prncipale dell'editor
 class pyText:
 
-    #Definizione del dunder init della classe pytext
+    #Definizione inizializzatore della classe pytext
     def __init__(self, master):
 
         #Inizializzazione testo e geometria della finestra di master come la finestra principale
@@ -100,11 +106,14 @@ class pyText:
         #Configurazione per permettere lo scrolling del file di testo
         self.text.configure(yscrollcommand=self.scrollbar.set)
 
+        #Configurazione tag per evidenziare 
+        self.text.tag_configure("highlight",background="yellow",foreground="Black")
+
         #Creazione barre menu     
         menubar = tk.Menu(master)
         master.config(menu=menubar)
 
-        #Set statusbar
+        #Set statusbar e substitute bar
         self.statusbar = Statusbar(self)    
 
         #Set shortcuts
@@ -112,7 +121,6 @@ class pyText:
 
         #Configurazione dei vari menu
         self.menu = Menu(self,menubar)
-
 
     # Funzione per settare il nome del file nell'intestazione dell'editor
     def set_window_title(self, name=None):
@@ -167,6 +175,65 @@ class pyText:
                 self.statusbar.update_status(True)
         except Exception as e:
             print(e)
+
+    #Restituisce indice start ed end del testo dato in input
+    def search(self,*args):
+        search_text = tk.simpledialog.askstring("Search","Type the text to search")
+        if search_text:
+            start = self.text.search(search_text,"1.0",stopindex=tk.END)
+            if start:
+                end = f"{start}+{len(search_text)}c"
+                return start , end
+            else:
+                messagebox.showinfo("Text not found",f"Text : {search_text} not found!")
+                return None , None
+
+    #Sottolinea il testo tra start ed end
+    def highlight(self,start,end):
+        if start and end:
+            self.text.tag_remove("highlight","1.0",tk.END)
+            self.text.tag_add("highlight",start,end)
+            self.text.see(start)
+
+    #richiama search e highlight
+    def search_and_highlight(parent):
+        start , end = parent.search()
+        parent.highlight(start, end)
+
+    #Funzione per sostituire il testo se trovato
+    def substitute_window(self):
+            
+            #Set finestra per funzione di sostituzione
+            popup = tk.Toplevel(self.master)
+            popup.title("Substitution window")
+            popup.geometry("500x400")
+
+            #Etichetta per testo da cercare
+            tk.Label(popup,text="Text to replace : ").grid(row=0,column=0)
+            search_entry = tk.Entry(popup)
+            search_entry.grid(row=0,column=1)
+
+            #Etichetta per il testo da sostituire
+            tk.Label(popup,text="Replace with : ").grid(row=1,column=0)
+            replace_entry = tk.Entry(popup)
+            replace_entry.grid(row=1,column=1)
+
+            #Botton per effettuare sostituzione
+            bottone_substitute = tk.Button(popup,text="Sostituisci",command=lambda:self.substitute(search_entry.get(),replace_entry.get()))
+            bottone_substitute.grid(row=2,column=0)            
+
+    #Funzione per sostituzione
+    def substitute(self,search,replace):
+        if search:
+            start = "1.0"
+            while True:
+                start = self.text.search(search,start,stopindex=tk.END)
+                if not start:
+                    break
+                end = f"{start}+{len(search)}c"
+                self.text.delete(start,end)
+                self.text.insert(start,replace)
+
 
     #Funzione per definizione shortcuts
     def shortcuts(self):
